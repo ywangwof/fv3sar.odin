@@ -1,16 +1,19 @@
 #!/bin/bash
 
-CODEBASE="/scratch/ywang/comFV3SAR/regional_workflow.gsd"
-VARDEFNS="/scratch/ywang/comFV3SAR/regional_workflow.gsd/expt_dirs/gsd_test/var_defns.sh"
-WRKDIR="/scratch/ywang/comFV3SAR/regional_workflow.gsd/expt_dirs/gsd_test/log"
+source config.sh
 
-PDY="20180501"
+CODEBASE="${BASEDIR}"
+VARDEFNS="${EXPT_BASEDIR}/${EXPT_SUBDIR}/var_defns.sh"
+WRKDIR="${TMPDIR}"
+
+PDY="${DATE_FIRST_CYCL}"
+
 jobscript="run_FV3SAR.sh"
 
 read -r -d '' taskheader <<EOF
 #!/bin/sh -l
-#SBATCH -A smallqueue
-#SBATCH -p workq
+#SBATCH -A ${ACCOUNT}
+#SBATCH -p ${QUEUE_DEFAULT}
 #SBATCH -J fv3sar
 #SBATCH -N 1 -n 24
 #SBATCH --ntasks-per-node=24
