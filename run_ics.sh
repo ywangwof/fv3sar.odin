@@ -1,43 +1,34 @@
 #!/bin/bash
 
-VARDEFNS="${1-/scratch/ywang/comFV3SAR/test_runs/GDAS0530/var_defns.sh}"
+VARDEFNS="$(realpath ${1-var_defns.sh})"
 source ${VARDEFNS}
 
 #
 # Decode ${EXPTDIR}/FV3SAR_wflow.xml
 #
-read_dom () {
-    local IFS=\>
-    read -d \< ENTITY CONTENT
-    local ret=$?
-    TAG_NAME=${ENTITY%% *}
-    ATTRIBUTES=${ENTITY#* }
-    #echo "$TAG_NAME, $ATTRIBUTES"
-    return $ret
-}
-
-parse_entity () {
-    if [[ $TAG_NAME == "!ENTITY" ]] ; then
-        if [[ $ATTRIBUTES =~ "$1" ]]; then
-          #echo $ATTRIBUTES
-          local a=${ATTRIBUTES##* \"}
-          local b=${a%%\"}
-          #echo $b
-          eval ${1}=$b
-          return
-        fi
-    fi
-}
-
-while read_dom; do
-    parse_entity NPROCS_MAKE_ICS_SURF_LBC0
-    parse_entity NCORES_PER_NODE
-    parse_entity PROC_MAKE_ICS_SURF_LBC0
+while read line; do
+  if [[ $line =~ "<!ENTITY" ]]; then
+    line=${line##<!ENTITY}
+    line=${line%%>}
+    #echo $line
+    read var val <<<$line
+    eval $var=$val
+    #echo $var=$val
+  fi
 done < ${EXPTDIR}/FV3SAR_wflow.xml
 
 nodes=${PROC_MAKE_ICS_SURF_LBC0%%:*}
 ppn=${PROC_MAKE_ICS_SURF_LBC0##*=}
 numprocess=$(( nodes*ppn ))
+
+walltime=${RSRC_MAKE_ICS_SURF_LBC0#<walltime>}
+walltime=${walltime%</walltime>}
+
+queue=${QUEUE_DEFAULT#<queue>}
+queue=${queue%</queue>}
+
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
 
 #echo $NPROCS_MAKE_ICS_SURF_LBC0, $NCORES_PER_NODE, $PROC_MAKE_ICS_SURF_LBC0
 #echo $nodes, $ppn, $numprocess
@@ -64,12 +55,12 @@ jobscript="make_ICS.sh"
 read -r -d '' taskheader <<EOF
 #!/bin/sh -l
 #SBATCH -A ${ACCOUNT}
-#SBATCH -p ${QUEUE_DEFAULT}
+#SBATCH -p ${queue}
 #SBATCH -J make_ICS
 #SBATCH -N ${nodes} -n ${numprocess}
 #SBATCH --ntasks-per-node=${ppn}
 #SBATCH --exclusive
-#SBATCH -t 00:45:00
+#SBATCH -t ${walltime}
 #SBATCH -o out.ics_%j
 #SBATCH -e err.ics_%j
 

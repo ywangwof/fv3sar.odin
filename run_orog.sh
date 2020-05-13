@@ -1,7 +1,33 @@
 #!/bin/bash
 
-VARDEFNS="${1-/scratch/ywang/comFV3SAR/test_runs/GDAS0530/var_defns.sh}"
+VARDEFNS="$(realpath ${1-var_defns.sh})"
 source ${VARDEFNS}
+
+#
+# Decode ${EXPTDIR}/FV3SAR_wflow.xml
+#
+while read line; do
+  if [[ $line =~ "<!ENTITY" ]]; then
+    line=${line##<!ENTITY}
+    line=${line%%>}
+    #echo $line
+    read var val <<<$line
+    eval $var=$val
+    #echo $var=$val
+  fi
+done < ${EXPTDIR}/FV3SAR_wflow.xml
+
+nodes=${PROC_MAKE_OROG%%:*}
+ppn=${PROC_MAKE_OROG##*=}
+numprocess=$(( nodes*ppn ))
+
+walltime=${RSRC_MAKE_OROG#<walltime>}
+walltime=${walltime%</walltime>}
+
+queue=${QUEUE_DEFAULT#<queue>}
+queue=${queue%</queue>}
+
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 CODEBASE="${HOMErrfs}"
 PDY="${DATE_FIRST_CYCL}"
@@ -19,12 +45,12 @@ cd $WRKDIR
 read -r -d '' taskheader <<EOF
 #!/bin/sh -l
 #SBATCH -A ${ACCOUNT}
-#SBATCH -p ${QUEUE_DEFAULT}
+#SBATCH -p ${queue}
 #SBATCH -J fv3_orog
-#SBATCH -N 1 -n 1
-#SBATCH --ntasks-per-node=1
+#SBATCH -N ${nodes} -n ${numprocess}
+#SBATCH --ntasks-per-node=${ppn}
 #SBATCH --exclusive
-#SBATCH -t 02:45:00
+#SBATCH -t ${walltime}
 #SBATCH -o out.orog_%j
 #SBATCH -e err.orog_%j
 

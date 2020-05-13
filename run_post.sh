@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VARDEFNS="${1-/scratch/ywang/comFV3SAR/test_runs/GDAS0530/var_defns.sh}"
+VARDEFNS="$(realpath ${1-var_defns.sh})"
 source ${VARDEFNS}
 
 #
@@ -27,6 +27,7 @@ walltime=${walltime%</walltime>}
 queue=${QUEUE_DEFAULT#<queue>}
 queue=${queue%</queue>}
 
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 CODEBASE="${HOMErrfs}"
 PDY="${DATE_FIRST_CYCL}"
