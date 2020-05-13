@@ -1,36 +1,71 @@
 #!/bin/bash
 
-source config.sh
+VARDEFNS="${1-/scratch/ywang/comFV3SAR/test_runs/GDAS0530/var_defns.sh}"
+source ${VARDEFNS}
 
-CODEBASE="${BASEDIR}"
-VARDEFNS="${EXPT_BASEDIR}/${EXPT_SUBDIR}/var_defns.sh"
-WRKDIR="${TMPDIR}"
+#
+# Decode ${EXPTDIR}/FV3SAR_wflow.xml
+#
+while read line; do
+  if [[ $line =~ "<!ENTITY" ]]; then
+    line=${line##<!ENTITY}
+    line=${line%%>}
+    #echo $line
+    read var val <<<$line
+    eval $var=$val
+    #echo $var=$val
+  fi
+done < ${EXPTDIR}/FV3SAR_wflow.xml
 
+
+nodes=${PROC_RUN_FCST%%:*}
+ppn=${PROC_RUN_FCST##*=}
+numprocess=$(( nodes*ppn ))
+
+walltime=${RSRC_RUN_FCST#<walltime>}
+walltime=${walltime%</walltime>}
+
+queue=${QUEUE_DEFAULT#<queue>}
+queue=${queue%</queue>}
+
+CODEBASE="${HOMErrfs}"
 PDY="${DATE_FIRST_CYCL}"
+HH="${CYCL_HRS}"
+CYCLE_DIR="${EXPTDIR}/${PDY}${HH}"
+
+WRKDIR="${LOGDIR}"
+
+if [[ ! -d $WRKDIR ]]; then
+  mkdir $WRKDIR
+fi
+
+cd $WRKDIR
 
 jobscript="run_FV3SAR.sh"
 
 read -r -d '' taskheader <<EOF
 #!/bin/sh -l
 #SBATCH -A ${ACCOUNT}
-#SBATCH -p ${QUEUE_DEFAULT}
+#SBATCH -p ${queue}
 #SBATCH -J fv3sar
-#SBATCH -N 1 -n 24
-#SBATCH --ntasks-per-node=24
+#SBATCH --nodes=${nodes} --ntasks-per-node=${ppn}
 #SBATCH --exclusive
-#SBATCH -t 08:45:00
+#SBATCH -t ${walltime}
 #SBATCH -o out.fv3sar_%j
 #SBATCH -e err.fv3sar_%j
 
-export SCRIPT_VAR_DEFNS_FP="${VARDEFNS}"
-export CDATE="${PDY}00"
+export GLOBAL_VAR_DEFNS_FP="${VARDEFNS}"
+export CDATE="${PDY}${HH}"
 export PDY="${PDY}"
+export CYCLE_DIR="${CYCLE_DIR}"
+
+export NPROCS=${numprocess}
 
 EOF
 
 
 cd $WRKDIR
-cp ${CODEBASE}/jobs/JREGIONAL_RUN_FV3 ${jobscript}
+cp ${CODEBASE}/jobs/JREGIONAL_RUN_FCST ${jobscript}
 
 sed -i "1d" ${jobscript}
 echo "$taskheader" | cat - ${jobscript} > temp && mv temp ${jobscript}

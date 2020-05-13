@@ -7,40 +7,36 @@ CODEBASE="${HOMErrfs}"
 PDY="${DATE_FIRST_CYCL}"
 
 WRKDIR="${LOGDIR}"
+
 if [[ ! -d $WRKDIR ]]; then
   mkdir $WRKDIR
 fi
 
 cd $WRKDIR
 #
-# make grid
+# make orog
 #
 read -r -d '' taskheader <<EOF
 #!/bin/sh -l
 #SBATCH -A ${ACCOUNT}
 #SBATCH -p ${QUEUE_DEFAULT}
-#SBATCH -J fv3_grid
+#SBATCH -J fv3_orog
 #SBATCH -N 1 -n 1
 #SBATCH --ntasks-per-node=1
 #SBATCH --exclusive
 #SBATCH -t 02:45:00
-#SBATCH -o out.grid_%j
-#SBATCH -e err.grid_%j
+#SBATCH -o out.orog_%j
+#SBATCH -e err.orog_%j
 
 export GLOBAL_VAR_DEFNS_FP="${VARDEFNS}"
-export USHDIR="${HOMErrfs}/ush"
-
-source ${HOMErrfs}/sorc/UFS_UTILS_develop/modulefiles/fv3gfs/fre-nctools.odin
-
+export PDY="${PDY}"
 
 EOF
+cp ${CODEBASE}/jobs/JREGIONAL_MAKE_OROG make_orog.sh
 
+sed -i "1d" make_orog.sh
+echo "$taskheader" | cat - make_orog.sh > temp && mv temp make_orog.sh
 
-cp ${CODEBASE}/jobs/JREGIONAL_MAKE_GRID make_grid.sh
-
-sed -i "1d" make_grid.sh
-echo "$taskheader" | cat - make_grid.sh > temp && mv temp make_grid.sh
-
-sbatch make_grid.sh
+sbatch make_orog.sh
 
 exit 0
