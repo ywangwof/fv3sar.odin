@@ -12,7 +12,8 @@ function usage {
     echo "              -h              Display this message"
     echo "              -n              Show command to be run only"
     echo "              -v              Verbose mode"
-    echo "              -r   run_fcst   Tasks to be run, one in (run_grid, run_orog, run_sfc, run_ics, run_lbc, run_fcst, run_post)"
+    echo "              -m   odin       Machine (odin, stampede)"
+    echo "              -r   '   '      Tasks to be run, one in (grid, orog, sfc, ics, lbc, fcst, post)"
     echo " "
     echo "                                     -- By Y. Wang (2020.10.21)"
     echo " "
@@ -27,9 +28,18 @@ function usage {
 
 show=0
 verb=0
-task="run_fcst"
+task=" "
 xmlparser="$(dirname $0)/read_xml.py"
 VARDEFNS="./var_defns.sh"
+host_name=$(hostname)
+if [[ $host_name =~ "stampede2" ]]; then
+  machine="stampede"
+elif [[ $host_name =~ "odin" ]]; then
+  machine="odin"
+else
+  echo "ERROR: unsupported machine - $host_name"
+  usage 0
+fi
 
 #-----------------------------------------------------------------------
 #
@@ -55,6 +65,10 @@ while [[ $# > 0 ]]
             task=$2
             shift
             ;;
+        -m)
+            machine=$2
+            shift
+            ;;
         -*)
             echo "Unknown option: $key"
             exit
@@ -72,7 +86,7 @@ while [[ $# > 0 ]]
     shift # past argument or value
 done
 
-if [[ $task =~ run_(grid|orog|sfc|ics|lbc|fcst|post) ]]; then
+if [[ $task =~ (grid|orog|sfc|ics|lbc|fcst|post) ]]; then
     echo "Task     = $task"
 else
     echo "ERROR: unsupport task - $task"
@@ -97,26 +111,26 @@ VARDEFNS="$(realpath ${VARDEFNS})"
 source ${VARDEFNS}
 
 declare -A tasknames  queues wrappers
-tasknames=(["run_grid"]="make_grid"     ["run_orog"]="make_orog"  \
-           ["run_sfc"]="make_sfc_climo" ["run_ics"]="make_ics"    \
-           ["run_lbc"]="make_lbcs"      ["run_fcst"]="run_fcst"   \
-           ["run_post"]="run_post" )
+tasknames=(["grid"]="make_grid"     ["orog"]="make_orog"  \
+           ["sfc"]="make_sfc_climo" ["ics"]="make_ics"    \
+           ["lbc"]="make_lbcs"      ["fcst"]="run_fcst"   \
+           ["post"]="run_post" )
 
-queues=(["run_grid"]="${QUEUE_DEFAULT}" ["run_orog"]="${QUEUE_DEFAULT}" \
-        ["run_sfc"]="${QUEUE_DEFAULT}"  ["run_ics"]="${QUEUE_DEFAULT}"  \
-        ["run_lbc"]="${QUEUE_DEFAULT}"  ["run_fcst"]="${QUEUE_FCST}"    \
-        ["run_post"]="${QUEUE_DEFAULT}")
+queues=(["grid"]="${QUEUE_DEFAULT}" ["orog"]="${QUEUE_DEFAULT}" \
+        ["sfc"]="${QUEUE_DEFAULT}"  ["ics"]="${QUEUE_DEFAULT}"  \
+        ["lbc"]="${QUEUE_DEFAULT}"  ["fcst"]="${QUEUE_FCST}"    \
+        ["post"]="${QUEUE_DEFAULT}")
 
-wrappers=(["run_grid"]="run_make_grid.sh"     ["run_orog"]="run_make_orog.sh" \
-          ["run_sfc"]="run_make_sfc_climo.sh" ["run_ics"]="run_make_ics.sh"   \
-          ["run_lbc"]="run_make_lbcs.sh"      ["run_fcst"]="run_fcst.sh"      \
-          ["run_post"]="run_post.sh" )
+wrappers=(["grid"]="run_make_grid.sh"     ["orog"]="run_make_orog.sh" \
+          ["sfc"]="run_make_sfc_climo.sh" ["ics"]="run_make_ics.sh"   \
+          ["lbc"]="run_make_lbcs.sh"      ["fcst"]="run_fcst.sh"      \
+          ["post"]="run_post.sh" )
 
 
 #---------------- Decode rocoto XML file -------------------------------
 
 metatask=""
-if [[ $task =~ "run_post" ]]; then
+if [[ $task =~ "post" ]]; then
   metatask="-m"
 fi
 
@@ -135,6 +149,24 @@ if [[ $verb -eq 1 ]]; then
     echo "walltime = $walltime"
     echo "queue    = $queue"
 fi
+
+##---------------- Prepare Python environment --------------------------
+
+case $machine in
+    odin)
+        read -r -d '' pythonstring <<- EOM
+		source /scratch/software/Odin/python/anaconda2/etc/profile.d/conda.sh
+		conda activate regional_workflow"
+EOM
+        ;;
+    stampede)
+        pythonstring="module load python3/3.7.0"
+        ;;
+    *)
+        echo "ERROR: unsupported machine - $machine"
+        usage 0
+        ;;
+esac
 
 ##================ Prepare job script ==================================
 
@@ -158,8 +190,7 @@ read -r -d '' taskheader <<EOF
 #SBATCH -o out.${tasknames[$task]}_%j
 #SBATCH -e err.${tasknames[$task]}_%j
 
-source /scratch/software/Odin/python/anaconda2/etc/profile.d/conda.sh
-conda activate regional_workflow
+${pythonstring}
 
 export EXPTDIR=${EXPTDIR}
 
