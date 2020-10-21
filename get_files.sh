@@ -4,15 +4,6 @@ VARDEFNS="$(realpath ${1-var_defns.sh})"
 source ${VARDEFNS}
 
 CODEBASE="${HOMErrfs}"
-PDY="${DATE_FIRST_CYCL}"
-HH="${CYCL_HRS}"
-CYCLE_DIR="${EXPTDIR}/${PDY}${HH}"
-
-EXTFILE_BASE="/scratch/00315/tg455890/${PDY}/${PDY}${HH}_mem001"
-
-sed -i -e "/EXTRN_MDL_FILES_SYSBASEDIR_ICS=/c\EXTRN_MDL_FILES_SYSBASEDIR_ICS=\"${EXTFILE_BASE}\"" ${VARDEFNS}
-sed -i -e "/EXTRN_MDL_FILES_SYSBASEDIR_LBCS=/c\EXTRN_MDL_FILES_SYSBASEDIR_LBCS=\"${EXTFILE_BASE}\"" ${VARDEFNS}
-
 WRKDIR="${LOGDIR}"
 
 if [[ ! -d $WRKDIR ]]; then
@@ -30,19 +21,14 @@ jobscript="get_ics_files.sh"
 read -r -d '' taskheader <<EOF
 #!/bin/bash
 
-export GLOBAL_VAR_DEFNS_FP="${VARDEFNS}"
-export PDY="${PDY}"
+source /scratch/software/Odin/python/anaconda2/etc/profile.d/conda.sh
+conda activate regional_workflow
 
-export CDATE="${PDY}${HH}"
-export EXTRN_MDL_NAME="${EXTRN_MDL_NAME_ICS}"
-export ICS_OR_LBCS="ICS"
-export CYCLE_DIR="${CYCLE_DIR}"
+export EXPTDIR=${EXPTDIR}
 
 EOF
 
-cp ${CODEBASE}/jobs/JREGIONAL_GET_EXTRN_FILES ${jobscript}
-
-sed -i "1d" ${jobscript}
+sed "1d" ${CODEBASE}/ush/wrappers/run_get_ics.sh > ${jobscript}
 echo "$taskheader" | cat - ${jobscript} > temp && mv temp ${jobscript}
 
 chmod +x ${jobscript}
@@ -59,19 +45,14 @@ jobscript="get_lbc_files.sh"
 read -r -d '' taskheader <<EOF
 #!/bin/bash
 
-export GLOBAL_VAR_DEFNS_FP="${VARDEFNS}"
-export PDY="${PDY}"
+source /scratch/software/Odin/python/anaconda2/etc/profile.d/conda.sh
+conda activate regional_workflow
 
-export CDATE="${PDY}${HH}"
-export EXTRN_MDL_NAME="${EXTRN_MDL_NAME_LBCS}"
-export ICS_OR_LBCS="LBCS"
-export CYCLE_DIR="${CYCLE_DIR}"
+export EXPTDIR=${EXPTDIR}
 
 EOF
 
-cp ${CODEBASE}/jobs/JREGIONAL_GET_EXTRN_FILES ${jobscript}
-
-sed -i "1d" ${jobscript}
+sed "1d" ${CODEBASE}/ush/wrappers/run_get_lbcs.sh > ${jobscript}
 echo "$taskheader" | cat - ${jobscript} > temp && mv temp ${jobscript}
 
 chmod +x ${jobscript}

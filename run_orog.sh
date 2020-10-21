@@ -3,37 +3,26 @@
 VARDEFNS="$(realpath ${1-var_defns.sh})"
 source ${VARDEFNS}
 
-#
-# Decode ${EXPTDIR}/FV3SAR_wflow.xml
-#
-while read line; do
-  if [[ $line =~ "<!ENTITY" ]]; then
-    line=${line##<!ENTITY}
-    line=${line%%>}
-    #echo $line
-    read var val <<<$line
-    eval $var=$val
-    #echo $var=$val
-  fi
-done < ${EXPTDIR}/FV3SAR_wflow.xml
+xmlparser="$(dirname $0)/read_xml.py"
+taskname="make_orog"
 
-nodes=${PROC_MAKE_OROG%%:*}
-ppn=${PROC_MAKE_OROG##*=}
+resources=$($xmlparser -t $taskname -g nodes $EXPTDIR/FV3LAM_wflow.xml)
+#echo $resources
+
+nodes=${resources%%:ppn=*}
+ppn=${resources##?:ppn=}
 numprocess=$(( nodes*ppn ))
+walltime=$($xmlparser -t $taskname -g walltime $EXPTDIR/FV3LAM_wflow.xml)
+queue=${QUEUE_DEFAULT}
 
-walltime=${RSRC_MAKE_OROG#<walltime>}
-walltime=${walltime%</walltime>}
-
-queue=${QUEUE_DEFAULT#<queue>}
-queue=${queue%</queue>}
+#echo $nodes, $ppn, $numprocess, $walltime, $queue
+#exit 0
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 CODEBASE="${HOMErrfs}"
-PDY="${DATE_FIRST_CYCL}"
 
 WRKDIR="${LOGDIR}"
-
 if [[ ! -d $WRKDIR ]]; then
   mkdir $WRKDIR
 fi
@@ -54,15 +43,14 @@ read -r -d '' taskheader <<EOF
 #SBATCH -o out.orog_%j
 #SBATCH -e err.orog_%j
 
-export GLOBAL_VAR_DEFNS_FP="${VARDEFNS}"
-export PDY="${PDY}"
+export EXPTDIR=${EXPTDIR}
 
 EOF
-cp ${CODEBASE}/jobs/JREGIONAL_MAKE_OROG make_orog.sh
 
-sed -i "1d" make_orog.sh
-echo "$taskheader" | cat - make_orog.sh > temp && mv temp make_orog.sh
+jobscript="$taskname.job"
+sed "1d" ${CODEBASE}/ush/wrappers/run_make_orog.sh > $jobscript
+echo "$taskheader" | cat - $jobscript > temp && mv temp $jobscript
 
-sbatch make_orog.sh
+sbatch $jobscript
 
 exit 0

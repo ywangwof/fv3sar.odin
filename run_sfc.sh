@@ -2,47 +2,32 @@
 VARDEFNS="$(realpath ${1-var_defns.sh})"
 source ${VARDEFNS}
 
-#
-# Decode ${EXPTDIR}/FV3SAR_wflow.xml
-#
-while read line; do
-  if [[ $line =~ "<!ENTITY" ]]; then
-    line=${line##<!ENTITY}
-    line=${line%%>}
-    #echo $line
-    read var val <<<$line
-    eval $var=$val
-    #echo $var=$val
-  fi
-done < ${EXPTDIR}/FV3SAR_wflow.xml
+xmlparser="$(dirname $0)/read_xml.py"
+taskname="make_sfc_climo"
 
-nodes=${PROC_MAKE_SFC_CLIMO%%:*}
-ppn=${PROC_MAKE_SFC_CLIMO##*=}
+resources=$($xmlparser -t $taskname -g nodes $EXPTDIR/FV3LAM_wflow.xml)
+#echo $resources
+
+nodes=${resources%%:ppn=*}
+ppn=${resources##?:ppn=}
 numprocess=$(( nodes*ppn ))
+walltime=$($xmlparser -t $taskname -g walltime $EXPTDIR/FV3LAM_wflow.xml)
+queue=${QUEUE_DEFAULT}
 
-walltime=${RSRC_MAKE_GRID#<walltime>}
-walltime=${walltime%</walltime>}
-
-queue=${QUEUE_DEFAULT#<queue>}
-queue=${queue%</queue>}
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 CODEBASE="${HOMErrfs}"
-PDY="${DATE_FIRST_CYCL}"
 
 #
 # Prepare the job script and submit
 #
 WRKDIR="${EXPTDIR}/log"
-
 if [[ ! -d $WRKDIR ]]; then
   mkdir $WRKDIR
 fi
 
 cd $WRKDIR
-
-jobscript="make_sfc_climo.sh"
 
 read -r -d '' taskheader <<EOF
 #!/bin/bash
@@ -56,19 +41,13 @@ read -r -d '' taskheader <<EOF
 #SBATCH -o out.sfc_%j
 #SBATCH -e err.sfc_%j
 
-export GLOBAL_VAR_DEFNS_FP="${VARDEFNS}"
-export PDY="${PDY}"
-
-source ${HOMErrfs}/modulefiles/tasks/${MACHINE,,}/make_sfc_climo
-
-export NPROCS=${numprocess}
+export EXPTDIR=${EXPTDIR}
 
 EOF
 
+jobscript="$taskname.job"
 
-cp ${CODEBASE}/jobs/JREGIONAL_MAKE_SFC_CLIMO ${jobscript}
-
-sed -i "1d" ${jobscript}
+sed "1d" ${CODEBASE}/ush/wrappers/run_make_sfc_climo.sh > ${jobscript}
 echo "$taskheader" | cat - ${jobscript} > temp && mv temp ${jobscript}
 
 sbatch ${jobscript}

@@ -3,107 +3,55 @@
 VARDEFNS="$(realpath ${1-var_defns.sh})"
 source ${VARDEFNS}
 
-#
-# Decode ${EXPTDIR}/FV3SAR_wflow.xml
-#
-while read line; do
-  if [[ $line =~ "<!ENTITY" ]]; then
-    line=${line##<!ENTITY}
-    line=${line%%>}
-    #echo $line
-    read var val <<<$line
-    eval $var=$val
-    #echo $var=$val
-  fi
-done < ${EXPTDIR}/FV3SAR_wflow.xml
+xmlparser="$(dirname $0)/read_xml.py"
+taskname="run_post"
 
-nodes=${PROC_POST%%:*}
-ppn=${PROC_POST##*=}
+resources=$($xmlparser -t $taskname -m -g nodes $EXPTDIR/FV3LAM_wflow.xml)
+echo $resources
+
+nodes=${resources%%:ppn=*}
+ppn=${resources##?:ppn=}
 numprocess=$(( nodes*ppn ))
+walltime=$($xmlparser -t $taskname -m -g walltime $EXPTDIR/FV3LAM_wflow.xml)
+queue=${QUEUE_DEFAULT}
 
-walltime=${RSRC_POST#<walltime>}
-walltime=${walltime%</walltime>}
-
-queue=${QUEUE_DEFAULT#<queue>}
-queue=${queue%</queue>}
+#echo $nodes, $ppn, $numprocess, $walltime, $queue
+#exit 0
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 CODEBASE="${HOMErrfs}"
-PDY="${DATE_FIRST_CYCL}"
-HH="${CYCL_HRS}"
-CYCLE_DIR="${EXPTDIR}/${PDY}${HH}"
 
 WRKDIR="${LOGDIR}"
-
 if [[ ! -d $WRKDIR ]]; then
   mkdir $WRKDIR
 fi
 
 cd $WRKDIR
 
-declare -a fhrs=(${FHR})
-
-for fhr in ${fhrs[@]}; do
-  #echo $fhr
-
-  fhr3=$(printf "%03d" ${fhr#0})
-
-  dyn_file=${CYCLE_DIR}/dynf${fhr3}.nc
-  phy_file=${CYCLE_DIR}/phyf${fhr3}.nc
-
-  log_file=${CYCLE_DIR}/logf${fhr3}
-
-  wtime=0
-  while [[ ! -f ${log_file} ]]; do
-    echo "Waiting ($wtime seconds) for ${log_file}"
-    sleep 20
-    wtime=$(( wtime += 20 ))
-  done
-  #while [[ ! -f ${dyn_file} ]]; do
-  #  sleep 20
-  #  wtime=$(( wtime += 20 ))
-  #  echo "Waiting ($wtime seconds) for ${dyn_file}"
-  #done
-  #
-  #while [[ ! -f ${phy_file} ]]; do
-  #  sleep 10
-  #  wtime=$(( wtime += 10 ))
-  #  echo "Waiting ($wtime seconds) for ${phy_file}"
-  #done
-
-  jobscript="run_upp_${fhr3}.sh"
-
-  read -r -d '' taskheader <<EOF
+read -r -d '' taskheader <<EOF
 #!/bin/sh -l
 #SBATCH -A ${ACCOUNT}
 #SBATCH -p ${queue}
-#SBATCH -J fv3sar
+#SBATCH -J fv3_post
 #SBATCH --nodes=${nodes} --ntasks-per-node=${ppn}
 #SBATCH --exclusive
 #SBATCH -t ${walltime}
-#SBATCH -o out.upp_${fhr3}_%j
-#SBATCH -e err.upp_${fhr3}_%j
+#SBATCH -o out.post_%j
+#SBATCH -e err.post_%j
 
-export GLOBAL_VAR_DEFNS_FP="${VARDEFNS}"
-export CYCLE_DIR="${CYCLE_DIR}"
-export CDATE="${PDY}${HH}"
-export PDY="${PDY}"
+source /scratch/software/Odin/python/anaconda2/etc/profile.d/conda.sh
+conda activate regional_workflow
 
-export NPROCS=${numprocess}
-export cyc=${fhr#0}
-export fhr=${fhr}
+export EXPTDIR=${EXPTDIR}
 
 EOF
 
-  cd $WRKDIR
-  cp ${CODEBASE}/jobs/JREGIONAL_RUN_POST ${jobscript}
+jobscript="$taskname.job"
 
-  sed -i "1d" ${jobscript}
-  echo "$taskheader" | cat - ${jobscript} > temp && mv temp ${jobscript}
+sed "1d" ${CODEBASE}/ush/wrappers/run_post.sh > ${jobscript}
+echo "$taskheader" | cat - ${jobscript} > temp && mv temp ${jobscript}
 
-  sbatch ${jobscript}
-
-done
+sbatch ${jobscript}
 
 exit 0

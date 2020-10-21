@@ -3,48 +3,29 @@
 VARDEFNS="$(realpath ${1-var_defns.sh})"
 source ${VARDEFNS}
 
-#
-# Decode ${EXPTDIR}/FV3SAR_wflow.xml
-#
-while read line; do
-  if [[ $line =~ "<!ENTITY" ]]; then
-    line=${line##<!ENTITY}
-    line=${line%%>}
-    #echo $line
-    read var val <<<$line
-    eval $var=$val
-    #echo $var=$val
-  fi
-done < ${EXPTDIR}/FV3SAR_wflow.xml
+xmlparser="$(dirname $0)/read_xml.py"
 
+resources=$($xmlparser -t run_fcst -g nodes $EXPTDIR/FV3LAM_wflow.xml)
+echo $resources
 
-nodes=${PROC_RUN_FCST%%:*}
-ppn=${PROC_RUN_FCST##*=}
+nodes=${resources%%:ppn=*}
+ppn=${resources##?:ppn=}
 numprocess=$(( nodes*ppn ))
-
-walltime=${RSRC_RUN_FCST#<walltime>}
-walltime=${walltime%</walltime>}
-
-queue=${QUEUE_FCST#<queue>}
-#queue=${QUEUE_DEFAULT#<queue>}
-queue=${queue%</queue>}
+walltime=$($xmlparser -t run_fcst -g walltime $EXPTDIR/FV3LAM_wflow.xml)
+queue=${QUEUE_FCST}
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 CODEBASE="${HOMErrfs}"
-PDY="${DATE_FIRST_CYCL}"
-HH="${CYCL_HRS}"
-CYCLE_DIR="${EXPTDIR}/${PDY}${HH}"
 
 WRKDIR="${LOGDIR}"
-
 if [[ ! -d $WRKDIR ]]; then
   mkdir $WRKDIR
 fi
 
 cd $WRKDIR
 
-jobscript="run_FV3SAR.sh"
+jobscript="run_FV3SAR.job"
 
 read -r -d '' taskheader <<EOF
 #!/bin/sh -l
@@ -57,20 +38,15 @@ read -r -d '' taskheader <<EOF
 #SBATCH -o out.fv3sar_%j
 #SBATCH -e err.fv3sar_%j
 
-export GLOBAL_VAR_DEFNS_FP="${VARDEFNS}"
-export CDATE="${PDY}${HH}"
-export PDY="${PDY}"
-export CYCLE_DIR="${CYCLE_DIR}"
+source /scratch/software/Odin/python/anaconda2/etc/profile.d/conda.sh
+conda activate regional_workflow
 
-export NPROCS=${numprocess}
+export EXPTDIR=${EXPTDIR}
 
 EOF
 
 
-cd $WRKDIR
-cp ${CODEBASE}/jobs/JREGIONAL_RUN_FCST ${jobscript}
-
-sed -i "1d" ${jobscript}
+sed "1d" ${CODEBASE}/ush/wrappers/run_fcst.sh  > ${jobscript}
 echo "$taskheader" | cat - ${jobscript} > temp && mv temp ${jobscript}
 
 sbatch ${jobscript}

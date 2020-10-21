@@ -3,33 +3,20 @@
 VARDEFNS="$(realpath ${1-var_defns.sh})"
 source ${VARDEFNS}
 
-#
-# Decode ${EXPTDIR}/FV3SAR_wflow.xml
-#
-while read line; do
-  if [[ $line =~ "<!ENTITY" ]]; then
-    line=${line##<!ENTITY}
-    line=${line%%>}
-    #echo $line
-    read var val <<<$line
-    eval $var=$val
-    #echo $var=$val
-  fi
-done < ${EXPTDIR}/FV3SAR_wflow.xml
+xmlparser="$(dirname $0)/read_xml.py"
+taskname="make_grid"
 
-nodes=${PROC_MAKE_GRID%%:*}
-ppn=${PROC_MAKE_GRID##*=}
+resources=$($xmlparser -t $taskname -g nodes $EXPTDIR/FV3LAM_wflow.xml)
+#echo $resources
+
+nodes=${resources%%:ppn=*}
+ppn=${resources##?:ppn=}
 numprocess=$(( nodes*ppn ))
-
-walltime=${RSRC_MAKE_GRID#<walltime>}
-walltime=${walltime%</walltime>}
-
-queue=${QUEUE_DEFAULT#<queue>}
-queue=${queue%</queue>}
+walltime=$($xmlparser -t $taskname -g walltime $EXPTDIR/FV3LAM_wflow.xml)
+queue=${QUEUE_DEFAULT}
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 CODEBASE="${HOMErrfs}"
-PDY="${DATE_FIRST_CYCL}"
 
 WRKDIR="${LOGDIR}"
 if [[ ! -d $WRKDIR ]]; then
@@ -52,20 +39,16 @@ read -r -d '' taskheader <<EOF
 #SBATCH -o out.grid_%j
 #SBATCH -e err.grid_%j
 
-export GLOBAL_VAR_DEFNS_FP="${VARDEFNS}"
-export USHDIR="${HOMErrfs}/ush"
+source /scratch/software/Odin/python/anaconda2/etc/profile.d/conda.sh
+conda activate regional_workflow
 
-source ${HOMErrfs}/modulefiles/tasks/${MACHINE,,}/make_grid
-
-
+export EXPTDIR=${EXPTDIR}
 EOF
 
+jobscript="$taskname.job"
+sed "1d" ${CODEBASE}/ush/wrappers/run_make_grid.sh > $jobscript
+echo "$taskheader" | cat - $jobscript > temp && mv temp $jobscript
 
-cp ${CODEBASE}/jobs/JREGIONAL_MAKE_GRID make_grid.sh
-
-sed -i "1d" make_grid.sh
-echo "$taskheader" | cat - make_grid.sh > temp && mv temp make_grid.sh
-
-sbatch make_grid.sh
+sbatch $jobscript
 
 exit 0
