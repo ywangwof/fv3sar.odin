@@ -12,14 +12,14 @@ Step 2: Stage exernal model files
 
 Step 3: run _run_fv3lam.sh_ following these steps one by one
 
-    3.1: run_fv3lam.sh -r grid var_defns.sh
-    3.2: run_fv3lam.sh -r orog var_defns.sh
-    3.3: run_fv3lam.sh -r sfc  var_defns.sh
-    3.4: run_fv3lam.sh -r ics  var_defns.sh
-    3.5: run_fv3lam.sh -r lbc  var_defns.sh
-    3.6: run_fv3lam.sh -r fcst var_defns.sh
-    3.7: run_fv3lam.sh -r post var_defns.sh
+    3.1: run_fv3lam.sh var_defns.sh grid
+    3.2: run_fv3lam.sh var_defns.sh orog
+    3.3: run_fv3lam.sh var_defns.sh sfc
+    3.4: run_fv3lam.sh var_defns.sh ics
+    3.5: run_fv3lam.sh var_defns.sh lbc
+    3.6: run_fv3lam.sh var_defns.sh fcst
+    3.7: run_fv3lam.sh var_defns.sh post
 
-**Note**: 
-        - Step 3.1 - 3.7 will generate job script (SLURM) and then submit the job.
-        - Step 0, 1 and 2 will run the scripts on the front node.
+**Note**:
+    - Step 3.1 - 3.7 will generate job script (SLURM) and then submit the job.
+    - Step 0, 1 and 2 will run the scripts on the front node.
