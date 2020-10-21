@@ -19,7 +19,7 @@ case $machine in
     odin)
         read -r -d '' pythonstring <<- EOM
 		source /scratch/software/Odin/python/anaconda2/etc/profile.d/conda.sh
-		conda activate regional_workflow"
+		conda activate regional_workflow
 EOM
         ;;
     stampede)

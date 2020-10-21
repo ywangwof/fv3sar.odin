@@ -134,7 +134,7 @@ resources=$($xmlparser -t ${tasknames[$task]} $metatask -g nodes $EXPTDIR/FV3LAM
 #echo $resources
 
 nodes=${resources%%:ppn=*}
-ppn=${resources##?:ppn=}
+ppn=${resources##*:ppn=}
 numprocess=$(( nodes*ppn ))
 walltime=$($xmlparser -t ${tasknames[$task]} $metatask -g walltime $EXPTDIR/FV3LAM_wflow.xml)
 queue=${queues[$task]}
@@ -150,7 +150,7 @@ case $machine in
     odin)
         read -r -d '' pythonstring <<- EOM
 		source /scratch/software/Odin/python/anaconda2/etc/profile.d/conda.sh
-		conda activate regional_workflow"
+		conda activate regional_workflow
 EOM
         ;;
     stampede)
