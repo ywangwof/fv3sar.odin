@@ -10,7 +10,7 @@ Step 1: run `ush/generate_FV3SAR_wflow.sh`
 Step 2: Stage exernal model files
         $> `get_files.sh var_defns.sh`
 
-Step 3: run run_fv3lam.sh following these steps one by one
+Step 3: run _run_fv3lam.sh_ following these steps one by one
 
     3.1: run_fv3lam.sh -r grid var_defns.sh
     3.2: run_fv3lam.sh -r orog var_defns.sh
@@ -20,5 +20,6 @@ Step 3: run run_fv3lam.sh following these steps one by one
     3.6: run_fv3lam.sh -r fcst var_defns.sh
     3.7: run_fv3lam.sh -r post var_defns.sh
 
-Note: Step 3.1 - 3.7 will generate job script (SLURM) and then submit the job.
-      Step 0, 1 and 2 will run the scripts on the front node.
+**Note**: 
+        - Step 3.1 - 3.7 will generate job script (SLURM) and then submit the job.
+        - Step 0, 1 and 2 will run the scripts on the front node.
